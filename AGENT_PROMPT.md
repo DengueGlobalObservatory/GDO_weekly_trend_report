@@ -30,9 +30,29 @@ it has the exact GDO language rules (severity descriptors, British English,
 ## Step 0 — Environment probe (every run)
 Record `Rscript --version`, `gh --version && gh auth status`, whether
 `git push` looks preconfigured. R is a hard dependency — everything under
-`R/` is R, matching the main GDO repo's stack. If R is unavailable, STOP,
-write `BLOCKED_<today>.md`, commit it, open a GitHub Issue titled "GDO
-internal news report blocked: no R runtime."
+`R/` is R, matching the main GDO repo's stack.
+
+If `Rscript` is not on `PATH` (confirmed via `2026-08-11` test run — the
+default cloud environment has no R and no setup script configured), try to
+self-install before giving up: `apt-get update && apt-get install -y
+--no-install-recommends r-base-core` (or equivalent for whatever package
+manager is present), then install the R packages `httr`, `jsonlite`,
+`dplyr`, `readr`, `tibble` if missing. Give this a single attempt — if it
+fails (e.g. package mirror unreachable through the sandbox's egress proxy),
+don't retry in a loop.
+
+If R is still unavailable after that attempt, STOP, write
+`BLOCKED_<today>.md`, and try to commit + notify — but be aware (per the
+same test run) that this environment's git push and GitHub write access may
+also be unavailable: `git push` returned 403, and both
+`mcp__github__push_files` and `mcp__github__issue_write` returned "403
+Resource not accessible by integration" even though read calls
+(`mcp__github__get_me`, `list_issues`, `get_file_contents`) succeeded
+authenticated as the repo owner. If commit/push/issue-write all fail, that
+is itself the signal to surface — don't loop trying every possible
+workaround; note in your final summary exactly which of R-install,
+git push, and GitHub-issue-write failed and how, so a human can fix the
+underlying environment/permissions rather than re-diagnosing from scratch.
 
 ## Step 0.5 — Data-pull check
 Compute `target_render_date` = the most recent of {this month's 4th,

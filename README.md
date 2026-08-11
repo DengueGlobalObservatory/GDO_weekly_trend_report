@@ -60,6 +60,34 @@ Requires R with `httr`/`curl`, `jsonlite`, `dplyr`, `readr`, `stringr`,
 sandbox turns out to need it (see Step 0 of `AGENT_PROMPT.md`, an
 environment probe that runs every routine execution).
 
+## Known infrastructure gaps (found in the 2026-08-11 test run)
+
+The first live test firing of the scheduled routine surfaced two real
+environment gaps, not implementation bugs:
+
+1. **No R runtime by default**, and no setup script configured on the
+   environment — `AGENT_PROMPT.md` Step 0 now attempts a one-shot
+   self-install (`apt-get install r-base-core` + the needed R packages)
+   before falling back to a BLOCKED report. A more durable fix is
+   configuring a setup script (or a dedicated environment) that
+   preinstalls R — do this via the routine/environment settings at
+   https://claude.ai/code/routines if the self-install attempt proves
+   unreliable.
+2. **The GitHub write path is not authorised for this repo.** `git push`
+   returned 403, and the GitHub MCP tools' write calls
+   (`mcp__github__push_files`, `mcp__github__issue_write`) both returned
+   `403 Resource not accessible by integration` — even though the same
+   session's read calls (`get_me`, `list_issues`, `get_file_contents`)
+   succeeded, authenticated as the repo owner. This needs a human to grant
+   write (Contents + Issues) permission to the Claude Code GitHub
+   integration for `DengueGlobalObservatory/GDO_weekly_trend_report`
+   (check the org's installed GitHub Apps / the repo connection settings)
+   — nothing in this repo can work around it.
+
+Until (2) is fixed, every real run will get as far as writing a BLOCKED (or
+full) report locally in the sandbox and then fail to commit/notify —
+meaning nothing lands in this repo or as a GitHub Issue.
+
 ## Known drift risk
 
 `CONVENTIONS.md` is a manually-maintained excerpt of
