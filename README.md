@@ -82,23 +82,31 @@ runs — not implementation bugs:
    `mcp__github__issue_write` both returned `403 Resource not accessible by
    integration`, even though read calls succeeded — needed a human to grant
    write permission to the Claude Code GitHub integration for this repo.)
-3. **The GitHub Contents/Commits API is not authorised at the org level**
-   for calls `R/fetch_snapshot.R` makes to the *public upstream* data repo,
-   `DengueGlobalObservatory/DENV_global_observatory` (found 2026-08-12,
-   first real pull-week attempt). `httr::GET()` calls to
-   `api.github.com/repos/DengueGlobalObservatory/DENV_global_observatory/...`
-   return 403 with `"GitHub access is not enabled for this session. An org
-   admin must connect the Claude GitHub App for this organization."` —
-   distinct from gap #2 above (this is API read access to a *different*
-   repo, not write access to this one). Unauthenticated
-   `raw.githubusercontent.com` access to the actual data files works fine,
-   so this is specifically an API-endpoint authorisation gap, not a
-   data-availability problem. Needs an org admin to connect/authorise the
-   Claude GitHub App for `DengueGlobalObservatory` for `api.github.com`
-   access — see `BLOCKED_2026_08_12.md` for the full diagnostic. Until
-   fixed, every pull week will fail at Step 1 and produce a BLOCKED report
-   instead of a full one; news-only weeks (which don't call
-   `fetch_snapshot()`) are unaffected.
+3. ~~The GitHub Contents/Commits API is not authorised at the org level~~
+   **Resolved** as of the second 2026-08-12 run: `api.github.com/repos/
+   DengueGlobalObservatory/DENV_global_observatory/contents/...` now returns
+   200 (an org admin connected the Claude GitHub App for
+   `DengueGlobalObservatory` between the two 2026-08-12 runs). (Originally,
+   found in the first 2026-08-12 run: 403 with `"GitHub access is not
+   enabled for this session. An org admin must connect the Claude GitHub
+   App for this organization."`, distinct from gap #2 above since this was
+   API read access to a *different* repo, not write access to this one.)
+4. **`gh_headers()` in `R/fetch_snapshot.R` attaches this session's
+   `GITHUB_TOKEN` to every `httr::GET()` call, including the
+   `raw.githubusercontent.com` download** — but that host 404s when this
+   session's token is attached, even though the same URL returns 200 with
+   no auth header at all (found in the second 2026-08-12 run, immediately
+   after gap #3 above was resolved and Step 1 got further than before).
+   Confirmed with direct `curl`: no-auth → 200 with correct CSV body;
+   `-H "Authorization: token $GITHUB_TOKEN"` → 404, body literally `404:
+   Not Found`. This is a code-level fix (scope the auth header to
+   `api.github.com` calls only, not the raw download), not a permissions
+   gap — flagged for a human to apply rather than made unilaterally by the
+   routine, per the same policy applied to gap #3. See
+   `BLOCKED_2026_08_12.md` for the full diagnostic. Until fixed, every pull
+   week will fail at Step 1 and produce a BLOCKED report instead of a full
+   one; news-only weeks (which don't call `fetch_snapshot()`) are
+   unaffected.
 
 ## Known drift risk
 
