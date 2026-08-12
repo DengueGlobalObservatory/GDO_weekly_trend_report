@@ -108,12 +108,24 @@ get_path_commit_sha <- function(folder_name, repo = GDO_REPO, branch = GDO_BRANC
 }
 
 #' Download the nowcast CSV verbatim from raw.githubusercontent.com.
+#'
+#' Deliberately unauthenticated: raw.githubusercontent.com is a CDN, not the
+#' Contents/Commits REST API, and returns 404 (not 401/403) for an
+#' authenticated request to this public file even though the identical
+#' anonymous request returns 200. Confirmed 2026-08-12 (see
+#' BLOCKED_2026_08_12.md). gh_headers() attaches GITHUB_TOKEN and must not be
+#' used here — the other two API calls in this file (list_output_folder_dates,
+#' get_path_commit_sha) still need it.
 download_raw_csv <- function(folder_name, dest_path, repo = GDO_REPO, branch = GDO_BRANCH) {
   url <- sprintf(
     "https://raw.githubusercontent.com/%s/%s/Output/%s/DENV_cases_nowcast_output.csv",
     repo, branch, folder_name
   )
-  resp <- httr::GET(url, gh_headers(), httr::write_disk(dest_path, overwrite = TRUE))
+  resp <- httr::GET(
+    url,
+    httr::add_headers(.headers = c("User-Agent" = "GDO-internal-news-report")),
+    httr::write_disk(dest_path, overwrite = TRUE)
+  )
   if (httr::status_code(resp) != 200) {
     stop("download_raw_csv(): failed to download ", url, " (status ", httr::status_code(resp), ")")
   }
