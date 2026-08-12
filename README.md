@@ -6,6 +6,10 @@ Monday morning, connects the latest GDO trend picture to real-world dengue
 news, and hands a researcher raw material for Tuesday's LinkedIn/Bluesky
 posts. Not a public document.
 
+Live and working: first full end-to-end run (fetch → news search → report →
+commit → GitHub Issue) completed 2026-08-12. Next scheduled fire is Monday
+2026-08-17 08:00 UTC.
+
 ## How it's triggered
 
 Cron `0 8 * * 1` (Monday 08:00 UTC), via a Claude Code routine with a fresh
@@ -60,53 +64,23 @@ Requires R with `httr`/`curl`, `jsonlite`, `dplyr`, `readr`, `stringr`,
 sandbox turns out to need it (see Step 0 of `AGENT_PROMPT.md`, an
 environment probe that runs every routine execution).
 
-## Known infrastructure gaps
+## Operational notes
 
-Found in the 2026-08-11 test run, both since narrowed/resolved by later
-runs — not implementation bugs:
-
-1. **No R runtime by default**, and no setup script configured on the
-   environment — `AGENT_PROMPT.md` Step 0 now attempts a one-shot
-   self-install (`apt-get install r-base-core` + the needed R packages)
-   before falling back to a BLOCKED report. A more durable fix is
-   configuring a setup script (or a dedicated environment) that
-   preinstalls R — do this via the routine/environment settings at
-   https://claude.ai/code/routines if the self-install attempt proves
-   unreliable. Still present as of 2026-08-12 (self-install continues to
-   work as the one-shot fallback).
-2. ~~The GitHub write path is not authorised for this repo.~~ **Resolved**
-   as of the 2026-08-12 run: `git push` to `origin main` and the
-   `mcp__github__*` write tools both work for
-   `DengueGlobalObservatory/GDO_weekly_trend_report`. (Originally: `git
-   push` returned 403, and `mcp__github__push_files`/
-   `mcp__github__issue_write` both returned `403 Resource not accessible by
-   integration`, even though read calls succeeded — needed a human to grant
-   write permission to the Claude Code GitHub integration for this repo.)
-3. ~~The GitHub Contents/Commits API is not authorised at the org level~~
-   **Resolved** as of the second 2026-08-12 run: `api.github.com/repos/
-   DengueGlobalObservatory/DENV_global_observatory/contents/...` now returns
-   200 (an org admin connected the Claude GitHub App for
-   `DengueGlobalObservatory` between the two 2026-08-12 runs). (Originally,
-   found in the first 2026-08-12 run: 403 with `"GitHub access is not
-   enabled for this session. An org admin must connect the Claude GitHub
-   App for this organization."`, distinct from gap #2 above since this was
-   API read access to a *different* repo, not write access to this one.)
-4. **`gh_headers()` in `R/fetch_snapshot.R` attaches this session's
-   `GITHUB_TOKEN` to every `httr::GET()` call, including the
-   `raw.githubusercontent.com` download** — but that host 404s when this
-   session's token is attached, even though the same URL returns 200 with
-   no auth header at all (found in the second 2026-08-12 run, immediately
-   after gap #3 above was resolved and Step 1 got further than before).
-   Confirmed with direct `curl`: no-auth → 200 with correct CSV body;
-   `-H "Authorization: token $GITHUB_TOKEN"` → 404, body literally `404:
-   Not Found`. This is a code-level fix (scope the auth header to
-   `api.github.com` calls only, not the raw download), not a permissions
-   gap — flagged for a human to apply rather than made unilaterally by the
-   routine, per the same policy applied to gap #3. See
-   `BLOCKED_2026_08_12.md` for the full diagnostic. Until fixed, every pull
-   week will fail at Step 1 and produce a BLOCKED report instead of a full
-   one; news-only weeks (which don't call `fetch_snapshot()`) are
-   unaffected.
+- **R isn't preinstalled in the cloud sandbox.** `AGENT_PROMPT.md` Step 0
+  self-installs R + required packages on every run. This has worked
+  reliably across all live runs to date, but it's still a per-run cost —
+  worth replacing with a dedicated environment/setup script that
+  preinstalls R (via the routine/environment settings at
+  https://claude.ai/code/routines) if self-install ever proves flaky.
+- **`R/fetch_snapshot.R`'s raw-CSV download deliberately sends no
+  `Authorization` header** (see the comment on `download_raw_csv()`).
+  GitHub's raw-content CDN 404s an authenticated request to this public
+  file even though the identical anonymous request succeeds — the other
+  two API calls in that file still need the token. Full diagnostic history
+  in `BLOCKED_2026_08_12.md`.
+- GitHub write access (repo push + Issues) and org-level Contents/Commits
+  API access to `DENV_global_observatory` are both granted and confirmed
+  working.
 
 ## Known drift risk
 
