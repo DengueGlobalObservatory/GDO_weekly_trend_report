@@ -89,8 +89,3 @@ environment probe that runs every routine execution).
 (plus this repo's own house-tone note). Nothing keeps them in sync
 automatically — if the live site's severity thresholds or language rules
 change, update both files by hand.
-
-## Design plan
-
-Full build rationale and open questions:
-`/Users/lshks26/Dropbox/DMMG/DENV_dashboard/planning/GDO_internal_news_report_plan.md`
